@@ -1,5 +1,17 @@
 # ublk520
 
+## Human-written summary
+
+Netapp brand servers use customized drives with 520-byte blocks. Linux generally hates these and refuses to work with them at all. However, the underlying SCSI subsystem can directly access sectors, and provide access to all 520 bytes.
+
+Some drives can be reformatted to 512 bytes, while some cannot. This program is for those drives stuck at 520 bytes. It provides a "shim" that take 512-byte sectors from Linux, and writes them to the native 520-byte sectors in the first 512 bytes. The last 8 bytes are unused.
+
+To use, you run `ublk520`, then mount the newly exposed `/dev/ublkb0` device.
+
+This program is AI:W -- it was written by Claude, and reviewed and tested by myself. It works on a Dell server with one of these Netapp drives connected to a SAS3008 card.
+
+## This program
+
 Expose a disk with 520-byte sectors as a normal 512-byte-sector block device (`/dev/ublkbN`)
 using Linux ublk (kernel 6.0+). Linux's `sd` driver refuses non-power-of-two sector sizes
 (`Unsupported sector size 520`), so such drives (NetApp/EMC-formatted enterprise disks) show
