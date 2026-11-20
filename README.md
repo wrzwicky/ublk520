@@ -39,10 +39,10 @@ Then `mkfs`/mount `/dev/ublkbN` as usual. Ctrl-C (or SIGTERM) to stop.
 
 | Constant | Value | Why |
 |---|---|---|
-| `CHUNK_BLOCKS` | 1024 | Max 520-byte blocks per SG_IO command. A request never waits for or pads to this; it is only an upper bound. Check `/sys/block/<sdX>/queue/max_hw_sectors_kb` (was 16383 here, so no HBA limit). |
-| `IO_BUF_BYTES` | 512 KiB | Largest request the kernel will send us (1024 virtual sectors = one SG_IO). |
-| `NR_QUEUES` | 32 | One ublk queue per CPU. Each queue handles one request at a time, so parallelism comes from queues. Fewer queues than CPUs means jobs on CPUs that share a queue serialize. |
-| `QUEUE_DEPTH` | 8 | The handler is synchronous, so more depth only costs memory (32 x 8 x 512 KiB = 128 MiB total). |
+| `MAX_BLOCKS_PER_SCSI_COMMAND` | 1024 | Max 520-byte blocks per SG_IO command. A request never waits for or pads to this; it is only an upper bound. Check `/sys/block/<sdX>/queue/max_hw_sectors_kb` (was 16383 here, so no HBA limit). |
+| `UBLK_MAX_REQUEST_BYTES` | 512 KiB | Largest request the kernel will send us (1024 virtual sectors = one SG_IO). |
+| `UBLK_QUEUE_COUNT` | 32 | One ublk queue per CPU. Each queue handles one request at a time, so parallelism comes from queues. Fewer queues than CPUs means jobs on CPUs that share a queue serialize. |
+| `UBLK_QUEUE_DEPTH` | 8 | The handler is synchronous, so more depth only costs memory (32 x 8 x 512 KiB = 128 MiB total). |
 
 Known limit: a single-threaded workload (one `dd`, one `cp`, one DB connection) lands on a
 single queue and is serial. Large requests help (one command per request); small ones do not.
