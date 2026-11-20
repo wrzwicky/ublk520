@@ -1,0 +1,24 @@
+[Unit]
+Description=ublk520: expose 520-byte-sector SSD as 512-byte /dev/ublkb0
+# DefaultDependencies=no avoids an ordering cycle with local-fs.target; we order ourselves explicitly.
+DefaultDependencies=no
+After=systemd-modules-load.service
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe ublk_drv
+ExecStart=/usr/local/bin/ublk520-run.sh
+# Don't report "started" until the block device actually exists, so mounts and ZFS imports ordered after us wait.
+ExecStartPost=/bin/sh -c 'for i in $(seq 150); do [ -b /dev/ublkb0 ] && exit 0; sleep 0.2; done; exit 1'
+# SIGTERM makes the shim flush and detach cleanly; give it time, and never SIGKILL a device that may be mounted.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+SendSIGKILL=no
+# The HBA/drive may not be enumerated yet on early boot; retry.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -5,8 +5,9 @@
 //! Only valid for drives with protection information (PI/DIF) DISABLED.
 //!
 //! Usage:
-//!   sudo ublk520 /dev/sg4            # real drive via SG_IO
-//!   sudo ublk520 --file test.img     # test mode: regular file with 520-byte blocks
+//!   sudo ublk520 [--id N] /dev/sg4        # real drive via SG_IO
+//!   sudo ublk520 [--id N] --file test.img # test mode: regular file with 520-byte blocks
+//! --id N requests /dev/ublkbN (default: first free).
 
 use libublk::ctrl::{UblkCtrl, UblkCtrlBuilder};
 use libublk::io::{BufDescList, UblkDev, UblkIOCtx, UblkQueue};
@@ -18,9 +19,10 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::rc::Rc;
 
 const VSEC: usize = 512; // virtual sector size
-const CHUNK_BLOCKS: usize = 1024; // max physical blocks per SG_IO command
-const IO_BUF_BYTES: u32 = 512 * 1024; // max bytes per ublk request
-const QUEUE_DEPTH: u16 = 8;
+const CHUNK_BLOCKS: usize = 1024; // max physical blocks per SG_IO command (~520 KB)
+const IO_BUF_BYTES: u32 = 512 * 1024; // max bytes per ublk request (1024 virtual sectors)
+const NR_QUEUES: u16 = 32; // one per CPU; each queue handles one request at a time
+const QUEUE_DEPTH: u16 = 8; // handler is synchronous, so extra depth only costs memory
 
 // ---------------------------------------------------------------- SG_IO plumbing
 
@@ -299,17 +301,27 @@ fn wait_for_signal() {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: ublk520 <sg-device, e.g. /dev/sg4>\n       ublk520 --file <image with 520-byte blocks>");
+    eprintln!("usage: ublk520 [--id N] <sg-device, e.g. /dev/sg4>\n       ublk520 [--id N] --file <image with 520-byte blocks>");
     std::process::exit(2);
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let (path, kind) = match args.as_slice() {
-        [p] if !p.starts_with('-') => (p.clone(), Kind::Sg),
-        [f, p] if f == "--file" => (p.clone(), Kind::File),
-        _ => usage(),
-    };
+    let mut kind = Kind::Sg;
+    let mut dev_id: i32 = -1;
+    let mut path: Option<String> = None;
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--file" => kind = Kind::File,
+            "--id" => {
+                dev_id = it.next().and_then(|v| v.parse().ok()).unwrap_or_else(|| usage());
+            }
+            s if !s.starts_with('-') && path.is_none() => path = Some(s.to_string()),
+            _ => usage(),
+        }
+    }
+    let path = path.unwrap_or_else(|| usage());
 
     let file = OpenOptions::new()
         .read(true)
@@ -342,8 +354,8 @@ fn main() {
 
     let ctrl = UblkCtrlBuilder::default()
         .name("ublk520")
-        .id(-1)
-        .nr_queues(32_u16)
+        .id(dev_id)
+        .nr_queues(NR_QUEUES)
         .depth(QUEUE_DEPTH)
         .io_buf_bytes(IO_BUF_BYTES)
         .dev_flags(UblkFlags::UBLK_DEV_F_ADD_DEV)
