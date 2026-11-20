@@ -1,0 +1,12 @@
+[package]
+name = "ublk520"
+version = "0.1.0"
+edition = "2021"
+description = "Expose a 520-byte-sector SCSI/SATA disk as a 512-byte-sector ublk block device"
+
+[dependencies]
+libublk = "0.4"
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
